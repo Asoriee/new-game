@@ -1,0 +1,599 @@
+<script lang="ts">
+  import {
+    board,
+    BOARD_COLS,
+    BOARD_ROWS,
+    TOTAL_CELLS,
+    type BoardTile
+  } from '../../core/boardState.svelte';
+  import { CHAINS, GENERATORS, getItem } from '../../config/chains';
+  import { sound } from '../../services/audio';
+
+  let boardElement: HTMLDivElement | null = $state(null);
+  let dragTileIndex = $state<number | null>(null);
+  let dragPointer = $state<{ x: number; y: number } | null>(null);
+  let isPointerDragging = $state(false);
+  let startPointerPos = { x: 0, y: 0 };
+
+  function handlePointerDown(index: number, e: PointerEvent) {
+    const tile = board.cells[index];
+    if (!tile) {
+      if (board.selectedIndex !== null) {
+        board.moveOrSwapTile(board.selectedIndex, index);
+      }
+      return;
+    }
+
+    startPointerPos = { x: e.clientX, y: e.clientY };
+    dragTileIndex = index;
+    dragPointer = { x: e.clientX, y: e.clientY };
+    isPointerDragging = false;
+
+    // Capture pointer
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }
+
+  function handlePointerMove(e: PointerEvent) {
+    if (dragTileIndex === null) return;
+
+    const dist = Math.hypot(e.clientX - startPointerPos.x, e.clientY - startPointerPos.y);
+    if (dist > 8) {
+      isPointerDragging = true;
+      dragPointer = { x: e.clientX, y: e.clientY };
+    }
+  }
+
+  function handlePointerUp(index: number, e: PointerEvent) {
+    if (dragTileIndex === null) return;
+
+    if (!isPointerDragging) {
+      // Tap interaction
+      handleCellTap(index);
+    } else {
+      // Drag & Drop release: find drop target cell under pointer
+      const targetElement = document.elementFromPoint(e.clientX, e.clientY);
+      const cellElement = targetElement?.closest('[data-cell-index]');
+      if (cellElement) {
+        const targetIndex = Number(cellElement.getAttribute('data-cell-index'));
+        if (!isNaN(targetIndex) && targetIndex !== dragTileIndex) {
+          board.moveOrSwapTile(dragTileIndex, targetIndex);
+        }
+      }
+    }
+
+    dragTileIndex = null;
+    dragPointer = null;
+    isPointerDragging = false;
+  }
+
+  function handleCellTap(index: number) {
+    const prevSelected = board.selectedIndex;
+
+    if (prevSelected !== null && prevSelected !== index) {
+      const srcTile = board.cells[prevSelected];
+      const targetTile = board.cells[index];
+
+      // If we tapped on a valid merge target or empty cell
+      if (srcTile && (!targetTile || board.canMerge(prevSelected, index))) {
+        board.moveOrSwapTile(prevSelected, index);
+        return;
+      }
+    }
+
+    board.selectCell(index);
+  }
+
+  function handleSell() {
+    if (board.selectedIndex !== null) {
+      board.sellTile(board.selectedIndex);
+    }
+  }
+
+  let selectedTile = $derived(
+    board.selectedIndex !== null ? board.cells[board.selectedIndex] : null
+  );
+
+  let selectedItemDef = $derived(
+    selectedTile && !selectedTile.isGenerator
+      ? getItem(selectedTile.chainId, selectedTile.level)
+      : null
+  );
+
+  let selectedGeneratorDef = $derived(
+    selectedTile && selectedTile.isGenerator && selectedTile.generatorId
+      ? GENERATORS[selectedTile.generatorId]
+      : null
+  );
+</script>
+
+<div class="board-screen">
+  <!-- Board Grid Container (7 columns x 9 rows) -->
+  <div class="board-frame">
+    <div class="board-grid" bind:this={boardElement}>
+      {#each board.cells as tile, index}
+        {@const isSelected = board.selectedIndex === index}
+        {@const isValidMergeTarget =
+          board.selectedIndex !== null &&
+          board.selectedIndex !== index &&
+          board.canMerge(board.selectedIndex, index)}
+        {@const isDragging = dragTileIndex === index && isPointerDragging}
+
+        <div
+          class="board-cell {isSelected ? 'selected' : ''} {isValidMergeTarget ? 'merge-target' : ''}"
+          data-cell-index={index}
+          onpointerdown={(e) => handlePointerDown(index, e)}
+          onpointermove={handlePointerMove}
+          onpointerup={(e) => handlePointerUp(index, e)}
+          role="button"
+          tabindex="0"
+        >
+          {#if tile}
+            <div
+              class="tile-wrapper {isDragging ? 'dragging-original' : ''} {tile.isCobweb ? 'cobwebbed' : ''} {tile.isBubble ? 'bubble' : ''}"
+            >
+              {#if tile.isGenerator && tile.generatorId}
+                {@const gen = GENERATORS[tile.generatorId]}
+                <!-- Generator Tile -->
+                <div class="generator-tile" style="--gen-color: {gen?.color || '#f5cd79'}">
+                  <div class="tile-art">
+                    {@html gen?.svg || ''}
+                  </div>
+                  <div class="gen-badge">⚡</div>
+                </div>
+              {:else}
+                {@const itemDef = getItem(tile.chainId, tile.level)}
+                <!-- Standard Item Tile -->
+                <div class="item-tile" style="--item-color: {itemDef?.color || '#a4b0be'}">
+                  <div class="tile-art">
+                    {@html itemDef?.svg || ''}
+                  </div>
+                  <div class="level-badge">{tile.level}</div>
+                </div>
+              {/if}
+
+              <!-- Cobweb overlay -->
+              {#if tile.isCobweb}
+                <div class="cobweb-overlay" title="Паутина: объедините или снимите">
+                  <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M0 0l40 40M40 0L0 40M20 0v40M0 20h40" stroke="rgba(255,255,255,0.4)" stroke-width="0.8"/>
+                    <circle cx="20" cy="20" r="10" stroke="rgba(255,255,255,0.4)" stroke-width="0.8" fill="none"/>
+                    <circle cx="20" cy="20" r="16" stroke="rgba(255,255,255,0.3)" stroke-width="0.8" fill="none"/>
+                  </svg>
+                  <span class="web-icon">🕸️</span>
+                </div>
+              {/if}
+
+              <!-- Bubble overlay -->
+              {#if tile.isBubble}
+                <div class="bubble-overlay">
+                  <div class="bubble-shine"></div>
+                  <button
+                    class="bubble-pop-btn"
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      board.popBubble(index, false);
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              {/if}
+            </div>
+          {/if}
+
+          <!-- Particle Emitter in this cell -->
+          {#each board.particles.filter((p) => p.cellIndex === index) as particle (particle.id)}
+            <div class="sparkle-burst" style="--p-color: {particle.color}">
+              <span class="spark s1">✦</span>
+              <span class="spark s2">★</span>
+              <span class="spark s3">✦</span>
+              <span class="spark s4">★</span>
+            </div>
+          {/each}
+        </div>
+      {/each}
+    </div>
+  </div>
+
+  <!-- Dragging Floating Proxy -->
+  {#if isPointerDragging && dragTileIndex !== null && dragPointer}
+    {@const tile = board.cells[dragTileIndex]}
+    {#if tile}
+      <div
+        class="drag-proxy"
+        style="transform: translate3d({dragPointer.x - 28}px, {dragPointer.y - 28}px, 0)"
+      >
+        {#if tile.isGenerator && tile.generatorId}
+          {@html GENERATORS[tile.generatorId]?.svg || ''}
+        {:else}
+          {@html getItem(tile.chainId, tile.level)?.svg || ''}
+        {/if}
+      </div>
+    {/if}
+  {/if}
+
+  <!-- Bottom Item Info Panel -->
+  <div class="item-info-bar">
+    {#if selectedGeneratorDef}
+      <div class="info-content">
+        <div class="info-icon">
+          {@html selectedGeneratorDef.svg}
+        </div>
+        <div class="info-meta">
+          <div class="info-title">{selectedGeneratorDef.name}</div>
+          <div class="info-desc">Нажмите, чтобы создать предмет (-1 ⚡)</div>
+        </div>
+        <button
+          class="action-btn spawn-btn"
+          onclick={() => board.spawnFromGenerator(board.selectedIndex!)}
+        >
+          Создать ⚡
+        </button>
+      </div>
+    {:else if selectedItemDef && selectedTile}
+      <div class="info-content">
+        <div class="info-icon">
+          {@html selectedItemDef.svg}
+        </div>
+        <div class="info-meta">
+          <div class="info-title">
+            {selectedItemDef.name}
+            <span class="tier-tag">Ур. {selectedTile.level}</span>
+          </div>
+          <div class="info-desc">{selectedItemDef.desc}</div>
+        </div>
+        <div class="info-actions">
+          {#if !selectedTile.isCobweb && !selectedTile.isBubble}
+            <button class="action-btn sell-btn" onclick={handleSell}>
+              +{selectedItemDef.sellValue} 🪙
+            </button>
+          {:else if selectedTile.isCobweb}
+            <button
+              class="action-btn unlock-btn"
+              onclick={() => board.unlockCobweb(board.selectedIndex!)}
+            >
+              Снять паутину
+            </button>
+          {/if}
+        </div>
+      </div>
+    {:else}
+      <div class="info-placeholder">
+        <span>Перетаскивайте и объединяйте одинаковые предметы</span>
+      </div>
+    {/if}
+  </div>
+</div>
+
+<style>
+  .board-screen {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    position: relative;
+    padding: 6px 6px 4px 6px;
+    touch-action: none;
+  }
+
+  .board-frame {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 0;
+  }
+
+  .board-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    grid-template-rows: repeat(9, 1fr);
+    gap: 4px;
+    width: 100%;
+    height: 100%;
+    max-height: 520px;
+    aspect-ratio: 7 / 9;
+    padding: 6px;
+    background: radial-gradient(circle at 50% 50%, rgba(20, 27, 48, 0.95), rgba(10, 14, 25, 0.98));
+    border: 2px solid rgba(140, 122, 230, 0.3);
+    border-radius: var(--radius-md);
+    box-shadow:
+      inset 0 0 20px rgba(0, 0, 0, 0.8),
+      0 4px 20px rgba(0, 0, 0, 0.6);
+  }
+
+  .board-cell {
+    position: relative;
+    background: rgba(14, 19, 34, 0.7);
+    border: 1px solid rgba(140, 122, 230, 0.15);
+    border-radius: var(--radius-xs);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+    touch-action: none;
+    user-select: none;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+  }
+
+  .board-cell.selected {
+    border-color: var(--arcane-gold);
+    background: rgba(245, 205, 121, 0.12);
+    box-shadow: 0 0 10px rgba(245, 205, 121, 0.4), inset 0 0 8px rgba(245, 205, 121, 0.2);
+  }
+
+  .board-cell.merge-target {
+    border-color: var(--arcane-cyan);
+    background: rgba(0, 210, 211, 0.15);
+    animation: pulseGlow 1.2s infinite;
+  }
+
+  .tile-wrapper {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    transition: transform 0.12s ease;
+  }
+
+  .tile-wrapper.dragging-original {
+    opacity: 0.3;
+  }
+
+  .item-tile, .generator-tile {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .generator-tile {
+    background: radial-gradient(circle, rgba(245, 205, 121, 0.15), transparent 70%);
+    border-radius: var(--radius-xs);
+  }
+
+  .tile-art {
+    width: 82%;
+    height: 82%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  }
+
+  :global(.tile-art svg) {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .level-badge {
+    position: absolute;
+    bottom: 1px;
+    right: 2px;
+    background: rgba(9, 12, 23, 0.85);
+    border: 1px solid var(--item-color, #f5cd79);
+    color: var(--item-color, #f5cd79);
+    font-size: 9px;
+    font-weight: 700;
+    width: 14px;
+    height: 14px;
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+
+  .gen-badge {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    font-size: 10px;
+    color: var(--arcane-gold);
+    animation: bubbleFloat 2s infinite ease-in-out;
+  }
+
+  .cobweb-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 14, 25, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .cobweb-overlay svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .web-icon {
+    font-size: 14px;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+  }
+
+  .bubble-overlay {
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-xs);
+    border: 1.5px solid var(--arcane-gold);
+    box-shadow: 0 0 12px rgba(245, 205, 121, 0.6);
+    background: radial-gradient(circle, rgba(245, 205, 121, 0.2), transparent);
+    animation: bubbleFloat 1.6s infinite ease-in-out;
+  }
+
+  .bubble-pop-btn {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 16px;
+    height: 16px;
+    min-width: 16px;
+    min-height: 16px;
+    border-radius: var(--radius-full);
+    background: var(--arcane-ruby);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+  }
+
+  .drag-proxy {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 56px;
+    height: 56px;
+    pointer-events: none;
+    z-index: 999;
+    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.7)) drop-shadow(0 0 10px var(--arcane-gold));
+  }
+
+  :global(.drag-proxy svg) {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Particle Confetti / Sparks */
+  .sparkle-burst {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+  }
+
+  .spark {
+    position: absolute;
+    color: var(--p-color, #f5cd79);
+    font-size: 14px;
+    animation: mergeConfetti 0.5s ease-out forwards;
+  }
+
+  .s1 { --tx: -20px; --ty: -25px; }
+  .s2 { --tx: 20px; --ty: -25px; }
+  .s3 { --tx: -20px; --ty: 15px; }
+  .s4 { --tx: 20px; --ty: 15px; }
+
+  /* Bottom Item Info Bar */
+  .item-info-bar {
+    height: 60px;
+    width: 100%;
+    background: var(--bg-glass-strong);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    margin-top: 4px;
+  }
+
+  .info-content {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .info-icon {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(14, 20, 37, 0.9);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xs);
+    padding: 3px;
+    flex-shrink: 0;
+  }
+
+  :global(.info-icon svg) {
+    width: 100%;
+    height: 100%;
+  }
+
+  .info-meta {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .info-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .tier-tag {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--arcane-gold);
+    background: rgba(245, 205, 121, 0.15);
+    padding: 1px 5px;
+    border-radius: var(--radius-xs);
+  }
+
+  .info-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .action-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: var(--radius-sm);
+    min-height: 36px;
+    white-space: nowrap;
+  }
+
+  .spawn-btn {
+    background: linear-gradient(135deg, #f5cd79, #e58e26);
+    color: #3d2300;
+    box-shadow: 0 0 10px rgba(245, 205, 121, 0.4);
+  }
+
+  .sell-btn {
+    background: rgba(245, 205, 121, 0.15);
+    border: 1px solid rgba(245, 205, 121, 0.4);
+    color: var(--arcane-gold);
+  }
+
+  .unlock-btn {
+    background: linear-gradient(135deg, #10ac84, #00d2d3);
+    color: #042921;
+  }
+
+  .info-placeholder {
+    width: 100%;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-dim);
+    font-style: italic;
+  }
+</style>
