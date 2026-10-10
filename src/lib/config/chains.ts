@@ -17,58 +17,283 @@ export interface ChainDef {
   items: ItemDef[];
 }
 
+export interface GeneratorDropRate {
+  level: number;
+  weight: number;
+}
+
 export interface GeneratorDef {
   id: string;
+  familyId: string;
+  level: number;
   name: string;
   spawnChainId: string;
   color: string;
+  maxCharges: number;
+  cooldownSeconds: number;
+  dropRates: GeneratorDropRate[];
   svg: string;
 }
 
-export const GENERATORS: Record<string, GeneratorDef> = {
+export const GENERATOR_TIERS: Record<string, Record<number, GeneratorDef>> = {
   gen_cauldron: {
-    id: 'gen_cauldron',
-    name: 'Алхимический Котел',
-    spawnChainId: 'potions',
-    color: '#8c7ae6',
-    svg: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <ellipse cx="24" cy="14" rx="14" ry="4" fill="#353b48" stroke="#f5cd79" stroke-width="1.5"/>
-      <ellipse cx="24" cy="14" rx="11" ry="2.5" fill="#8c7ae6" opacity="0.9"/>
-      <circle cx="21" cy="14" r="1.5" fill="#f5cd79"/>
-      <circle cx="27" cy="13.5" r="1" fill="#fff"/>
-      <path d="M10 14c0 12 4 22 14 22s14-10 14-22" fill="#2f3640" stroke="#f5cd79" stroke-width="1.5"/>
-      <path d="M14 24h20" stroke="#f5cd79" stroke-width="1.5" stroke-dasharray="2 3"/>
-      <path d="M16 36l-3 6m19-6l3 6" stroke="#e58e26" stroke-width="2.5" stroke-linecap="round"/>
-      <circle cx="24" cy="27" r="3" fill="#9c88ff"/>
-      <path d="M21 7c2-3 4-3 6 0m-8 2c2-2 3-2 5 0" stroke="#f5cd79" stroke-width="1.2" stroke-linecap="round" opacity="0.8"/>
-    </svg>`
+    1: {
+      id: 'gen_cauldron_1',
+      familyId: 'gen_cauldron',
+      level: 1,
+      name: 'Глиняный Горшок',
+      spawnChainId: 'potions',
+      color: '#b0724b',
+      maxCharges: 12,
+      cooldownSeconds: 60,
+      dropRates: [{ level: 1, weight: 100 }],
+      svg: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="24" cy="18" rx="11" ry="3.5" fill="#5c3826" stroke="#b0724b" stroke-width="1.5"/>
+        <ellipse cx="24" cy="18" rx="8.5" ry="2" fill="#784421"/>
+        <path d="M13 18c0 10 3 18 11 18s11-8 11-18" fill="#8c502b" stroke="#b0724b" stroke-width="1.5"/>
+        <path d="M17 26h14" stroke="#e09260" stroke-width="1.2" stroke-linecap="round"/>
+        <circle cx="24" cy="18" r="1.5" fill="#f5cd79"/>
+      </svg>`
+    },
+    2: {
+      id: 'gen_cauldron_2',
+      familyId: 'gen_cauldron',
+      level: 2,
+      name: 'Медный Котел',
+      spawnChainId: 'potions',
+      color: '#e67e22',
+      maxCharges: 18,
+      cooldownSeconds: 90,
+      dropRates: [{ level: 1, weight: 75 }, { level: 2, weight: 25 }],
+      svg: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="24" cy="16" rx="13" ry="3.8" fill="#4a2511" stroke="#d35400" stroke-width="1.5"/>
+        <ellipse cx="24" cy="16" rx="10" ry="2.2" fill="#8c7ae6" opacity="0.8"/>
+        <path d="M11 16c0 11 4 20 13 20s13-9 13-20" fill="#b95319" stroke="#e67e22" stroke-width="1.6"/>
+        <path d="M10 20c-3 0-5 2-5 5s2 5 5 5m28-10c3 0 5 2 5 5s-2 5-5 5" stroke="#f39c12" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="21" cy="16" r="1.5" fill="#f5cd79"/>
+        <circle cx="27" cy="15.5" r="1" fill="#fff"/>
+        <path d="M18 36l-2 5m14-5l2 5" stroke="#7f3b14" stroke-width="2" stroke-linecap="round"/>
+      </svg>`
+    },
+    3: {
+      id: 'gen_cauldron_3',
+      familyId: 'gen_cauldron',
+      level: 3,
+      name: 'Алхимический Котел',
+      spawnChainId: 'potions',
+      color: '#8c7ae6',
+      maxCharges: 26,
+      cooldownSeconds: 120,
+      dropRates: [{ level: 1, weight: 60 }, { level: 2, weight: 30 }, { level: 3, weight: 10 }],
+      svg: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="24" cy="14" rx="14" ry="4" fill="#353b48" stroke="#f5cd79" stroke-width="1.5"/>
+        <ellipse cx="24" cy="14" rx="11" ry="2.5" fill="#8c7ae6" opacity="0.9"/>
+        <circle cx="21" cy="14" r="1.5" fill="#f5cd79"/>
+        <circle cx="27" cy="13.5" r="1" fill="#fff"/>
+        <path d="M10 14c0 12 4 22 14 22s14-10 14-22" fill="#2f3640" stroke="#f5cd79" stroke-width="1.5"/>
+        <path d="M14 24h20" stroke="#f5cd79" stroke-width="1.5" stroke-dasharray="2 3"/>
+        <path d="M16 36l-3 6m19-6l3 6" stroke="#e58e26" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="24" cy="27" r="3" fill="#9c88ff"/>
+        <path d="M21 7c2-3 4-3 6 0m-8 2c2-2 3-2 5 0" stroke="#f5cd79" stroke-width="1.2" stroke-linecap="round" opacity="0.8"/>
+      </svg>`
+    },
+    4: {
+      id: 'gen_cauldron_4',
+      familyId: 'gen_cauldron',
+      level: 4,
+      name: 'Астральный Тигель',
+      spawnChainId: 'potions',
+      color: '#f5cd79',
+      maxCharges: 36,
+      cooldownSeconds: 150,
+      dropRates: [{ level: 1, weight: 45 }, { level: 2, weight: 35 }, { level: 3, weight: 15 }, { level: 4, weight: 5 }],
+      svg: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="24" cy="12" rx="15" ry="4.5" fill="#1b1429" stroke="#f5cd79" stroke-width="2"/>
+        <ellipse cx="24" cy="12" rx="12" ry="3" fill="#9c88ff"/>
+        <circle cx="20" cy="12" r="2" fill="#fff"/>
+        <circle cx="28" cy="11.5" r="1.5" fill="#f5cd79"/>
+        <path d="M9 12c0 14 5 25 15 25s15-11 15-25" fill="#140f22" stroke="#f5cd79" stroke-width="2"/>
+        <ellipse cx="24" cy="24" rx="18" ry="5" stroke="#f5cd79" stroke-width="1" stroke-dasharray="3 3" opacity="0.7"/>
+        <path d="M14 24l5 3-5 3m20-6l-5 3 5 3" stroke="#f5cd79" stroke-width="1.2"/>
+        <circle cx="24" cy="25" r="4.5" fill="#8c7ae6" stroke="#fff" stroke-width="1"/>
+        <path d="M15 37l-4 6m22-6l4 6" stroke="#f5cd79" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M20 5c2-3 6-3 8 0m-10 2c3-2 5-2 7 0" stroke="#f5cd79" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>`
+    }
   },
   gen_desk: {
-    id: 'gen_desk',
-    name: 'Волшебный Пюпитр',
-    spawnChainId: 'scrolls',
-    color: '#e58e26',
-    svg: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 12l12-4 12 4-12 4z" fill="#4b382a" stroke="#f5cd79" stroke-width="1.5"/>
-      <path d="M15 13l9-3 9 3-9 3z" fill="#e1b12c" opacity="0.4"/>
-      <path d="M22 16v18m4-18v18" stroke="#352213" stroke-width="2"/>
-      <path d="M16 34h16m-12 0l-4 8m12-8l4 8" stroke="#f5cd79" stroke-width="1.5" stroke-linecap="round"/>
-      <path d="M18 10c2-2 4 1 6-1" stroke="#f5cd79" stroke-width="1.2" stroke-linecap="round"/>
-    </svg>`
+    1: {
+      id: 'gen_desk_1',
+      familyId: 'gen_desk',
+      level: 1,
+      name: 'Деревянный Пюпитр',
+      spawnChainId: 'scrolls',
+      color: '#8c502b',
+      maxCharges: 12,
+      cooldownSeconds: 60,
+      dropRates: [{ level: 1, weight: 100 }],
+      svg: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M14 14l10-3 10 3-10 3z" fill="#4b382a" stroke="#8c502b" stroke-width="1.5"/>
+        <path d="M16 14.5l8-2 8 2-8 2z" fill="#784421"/>
+        <path d="M23 17v17m2-17v17" stroke="#352213" stroke-width="2"/>
+        <path d="M18 34h12m-9 0l-3 7m9-7l3 7" stroke="#8c502b" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>`
+    },
+    2: {
+      id: 'gen_desk_2',
+      familyId: 'gen_desk',
+      level: 2,
+      name: 'Волшебная Конторка',
+      spawnChainId: 'scrolls',
+      color: '#e58e26',
+      maxCharges: 18,
+      cooldownSeconds: 90,
+      dropRates: [{ level: 1, weight: 75 }, { level: 2, weight: 25 }],
+      svg: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 12l12-4 12 4-12 4z" fill="#4b382a" stroke="#f5cd79" stroke-width="1.5"/>
+        <path d="M15 13l9-3 9 3-9 3z" fill="#e1b12c" opacity="0.4"/>
+        <path d="M22 16v18m4-18v18" stroke="#352213" stroke-width="2"/>
+        <path d="M16 34h16m-12 0l-4 8m12-8l4 8" stroke="#f5cd79" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M18 10c2-2 4 1 6-1" stroke="#f5cd79" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>`
+    },
+    3: {
+      id: 'gen_desk_3',
+      familyId: 'gen_desk',
+      level: 3,
+      name: 'Фолиантная Кафедра',
+      spawnChainId: 'scrolls',
+      color: '#f39c12',
+      maxCharges: 26,
+      cooldownSeconds: 120,
+      dropRates: [{ level: 1, weight: 60 }, { level: 2, weight: 30 }, { level: 3, weight: 10 }],
+      svg: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M10 12l14-5 14 5-14 5z" fill="#2c2c54" stroke="#f5cd79" stroke-width="1.8"/>
+        <path d="M13 13l11-4 11 4-11 4z" fill="#40407a"/>
+        <rect x="18" y="8" width="12" height="7" rx="1.5" fill="#f5cd79" stroke="#b33939" stroke-width="1"/>
+        <path d="M21 17v17m6-17v17" stroke="#f5cd79" stroke-width="2"/>
+        <path d="M14 34h20m-14 0l-4 8m14-8l4 8" stroke="#f5cd79" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="24" cy="25" r="3" fill="#ffb142"/>
+      </svg>`
+    },
+    4: {
+      id: 'gen_desk_4',
+      familyId: 'gen_desk',
+      level: 4,
+      name: 'Астральный Алтарь Знаний',
+      spawnChainId: 'scrolls',
+      color: '#f5cd79',
+      maxCharges: 36,
+      cooldownSeconds: 150,
+      dropRates: [{ level: 1, weight: 45 }, { level: 2, weight: 35 }, { level: 3, weight: 15 }, { level: 4, weight: 5 }],
+      svg: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 12l16-6 16 6-16 6z" fill="#130f40" stroke="#f5cd79" stroke-width="2"/>
+        <path d="M12 13l12-4.5 12 4.5-12 4.5z" fill="#30336b"/>
+        <ellipse cx="24" cy="9" rx="10" ry="4" stroke="#f5cd79" stroke-width="1" stroke-dasharray="2 2"/>
+        <rect x="18" y="5" width="12" height="7" rx="2" fill="#7ed6df" stroke="#fff" stroke-width="1"/>
+        <path d="M24 3v3m-3-1.5h6" stroke="#f5cd79" stroke-width="1.2"/>
+        <path d="M20 18v16m8-16v16" stroke="#f5cd79" stroke-width="2.5"/>
+        <path d="M12 34h24m-16 0l-5 8m16-8l5 8" stroke="#f5cd79" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="24" cy="26" r="4.5" fill="#e056fd" stroke="#f5cd79" stroke-width="1.5"/>
+      </svg>`
+    }
   },
   gen_geode: {
-    id: 'gen_geode',
-    name: 'Кристальный Геод',
-    spawnChainId: 'crystals',
-    color: '#00d2d3',
-    svg: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 28l6-16 12 2 8 12-10 14z" fill="#1e272e" stroke="#00d2d3" stroke-width="1.5"/>
-      <path d="M18 24l6-10 6 10-6 8z" fill="#00d2d3" opacity="0.6"/>
-      <path d="M21 21l3-6 3 6-3 5z" fill="#fff" opacity="0.8"/>
-      <circle cx="24" cy="18" r="8" fill="#48dbfb" opacity="0.2"/>
-    </svg>`
+    1: {
+      id: 'gen_geode_1',
+      familyId: 'gen_geode',
+      level: 1,
+      name: 'Обычный Геод',
+      spawnChainId: 'crystals',
+      color: '#57606f',
+      maxCharges: 10,
+      cooldownSeconds: 60,
+      dropRates: [{ level: 1, weight: 100 }],
+      svg: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M14 26l5-13 10 2 6 10-8 12z" fill="#2f3542" stroke="#57606f" stroke-width="1.5"/>
+        <path d="M19 23l5-8 5 8-5 6z" fill="#00d2d3" opacity="0.6"/>
+        <circle cx="24" cy="20" r="4" fill="#48dbfb" opacity="0.3"/>
+      </svg>`
+    },
+    2: {
+      id: 'gen_geode_2',
+      familyId: 'gen_geode',
+      level: 2,
+      name: 'Сияющий Сросток',
+      spawnChainId: 'crystals',
+      color: '#00d2d3',
+      maxCharges: 16,
+      cooldownSeconds: 90,
+      dropRates: [{ level: 1, weight: 75 }, { level: 2, weight: 25 }],
+      svg: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 28l6-16 12 2 8 12-10 14z" fill="#1e272e" stroke="#00d2d3" stroke-width="1.5"/>
+        <path d="M18 24l6-10 6 10-6 8z" fill="#00d2d3" opacity="0.6"/>
+        <path d="M21 21l3-6 3 6-3 5z" fill="#fff" opacity="0.8"/>
+        <circle cx="24" cy="18" r="8" fill="#48dbfb" opacity="0.2"/>
+      </svg>`
+    },
+    3: {
+      id: 'gen_geode_3',
+      familyId: 'gen_geode',
+      level: 3,
+      name: 'Первородная Мана-Жила',
+      spawnChainId: 'crystals',
+      color: '#48dbfb',
+      maxCharges: 24,
+      cooldownSeconds: 120,
+      dropRates: [{ level: 1, weight: 60 }, { level: 2, weight: 30 }, { level: 3, weight: 10 }],
+      svg: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M24 4l12 18-12 22-12-22z" fill="#0c2461" stroke="#48dbfb" stroke-width="2"/>
+        <path d="M24 4l8 18-8 22-8-22z" fill="#1e3799" stroke="#60a3bc" stroke-width="1.5"/>
+        <polygon points="24,10 30,22 24,34 18,22" fill="#82ccdd"/>
+        <circle cx="24" cy="22" r="5" fill="#fff" opacity="0.9"/>
+        <ellipse cx="24" cy="22" rx="18" ry="6" stroke="#48dbfb" stroke-width="1.2" stroke-dasharray="3 3"/>
+        <circle cx="10" cy="20" r="2" fill="#48dbfb"/>
+        <circle cx="38" cy="24" r="2" fill="#48dbfb"/>
+      </svg>`
+    }
   }
 };
+
+/**
+ * Universal lookup supporting both legacy generator keys ('gen_cauldron') and tier IDs ('gen_cauldron_1')
+ */
+export const GENERATORS: Record<string, GeneratorDef> = {
+  gen_cauldron: GENERATOR_TIERS.gen_cauldron[1],
+  gen_cauldron_1: GENERATOR_TIERS.gen_cauldron[1],
+  gen_cauldron_2: GENERATOR_TIERS.gen_cauldron[2],
+  gen_cauldron_3: GENERATOR_TIERS.gen_cauldron[3],
+  gen_cauldron_4: GENERATOR_TIERS.gen_cauldron[4],
+  gen_desk: GENERATOR_TIERS.gen_desk[1],
+  gen_desk_1: GENERATOR_TIERS.gen_desk[1],
+  gen_desk_2: GENERATOR_TIERS.gen_desk[2],
+  gen_desk_3: GENERATOR_TIERS.gen_desk[3],
+  gen_desk_4: GENERATOR_TIERS.gen_desk[4],
+  gen_geode: GENERATOR_TIERS.gen_geode[1],
+  gen_geode_1: GENERATOR_TIERS.gen_geode[1],
+  gen_geode_2: GENERATOR_TIERS.gen_geode[2],
+  gen_geode_3: GENERATOR_TIERS.gen_geode[3]
+};
+
+export function getGeneratorTier(familyOrId: string, level: number = 1): GeneratorDef {
+  const family = familyOrId.replace(/_\d+$/, '');
+  const tiers = GENERATOR_TIERS[family] || GENERATOR_TIERS.gen_cauldron;
+  const maxLevel = Object.keys(tiers).length;
+  const targetLevel = Math.max(1, Math.min(maxLevel, level));
+  return tiers[targetLevel] || tiers[1];
+}
+
+export function pickSpawnLevel(dropRates: GeneratorDropRate[]): number {
+  const totalWeight = dropRates.reduce((sum, r) => sum + r.weight, 0);
+  let random = Math.random() * totalWeight;
+  for (const rate of dropRates) {
+    if (random < rate.weight) {
+      return rate.level;
+    }
+    random -= rate.weight;
+  }
+  return dropRates[0]?.level || 1;
+}
 
 export const CHAINS: Record<string, ChainDef> = {
   potions: {

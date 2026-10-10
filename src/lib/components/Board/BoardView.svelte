@@ -6,7 +6,13 @@
     TOTAL_CELLS,
     type BoardTile
   } from '../../core/boardState.svelte';
-  import { CHAINS, GENERATORS, getItem, getConsumableEnergyReward } from '../../config/chains';
+  import {
+    CHAINS,
+    GENERATORS,
+    getItem,
+    getConsumableEnergyReward,
+    getGeneratorTier
+  } from '../../config/chains';
   import { inventory } from '../../core/inventoryState.svelte';
   import InventoryDrawer from './InventoryDrawer.svelte';
   import { sound } from '../../services/audio';
@@ -17,6 +23,20 @@
   let dragPointer = $state<{ x: number; y: number } | null>(null);
   let isPointerDragging = $state(false);
   let startPointerPos = { x: 0, y: 0 };
+  let tick = $state(0);
+
+  $effect(() => {
+    const timer = setInterval(() => {
+      tick += 1;
+    }, 1000);
+    return () => clearInterval(timer);
+  });
+
+  function formatCooldown(seconds: number): string {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
 
   function handlePointerDown(index: number, e: PointerEvent) {
     const tile = board.cells[index];
@@ -104,7 +124,7 @@
 
   let selectedGeneratorDef = $derived(
     selectedTile && selectedTile.isGenerator && selectedTile.generatorId
-      ? GENERATORS[selectedTile.generatorId]
+      ? getGeneratorTier(selectedTile.generatorId, selectedTile.level || 1)
       : null
   );
 
@@ -160,13 +180,27 @@
               class="tile-wrapper {isDragging ? 'dragging-original' : ''} {tile.isCobweb ? 'cobwebbed' : ''} {tile.isBubble ? 'bubble' : ''}"
             >
               {#if tile.isGenerator && tile.generatorId}
-                {@const gen = GENERATORS[tile.generatorId]}
+                {@const gen = getGeneratorTier(tile.generatorId, tile.level || 1)}
+                {@const isSleeping = board.isGeneratorSleeping(tile)}
+                {@const remainingSecs = isSleeping ? board.getGeneratorRemainingCooldown(tile) : 0}
+
                 <!-- Generator Tile -->
-                <div class="generator-tile" style="--gen-color: {gen?.color || '#f5cd79'}">
+                <div class="generator-tile {isSleeping ? 'sleeping' : ''}" style="--gen-color: {gen.color}">
                   <div class="tile-art">
-                    {@html gen?.svg || ''}
+                    {@html gen.svg}
                   </div>
-                  <div class="gen-badge">⚡</div>
+
+                  {#if isSleeping}
+                    <div class="gen-sleep-overlay" title={t('gen.sleeping')}>
+                      <span class="sleep-icon">💤</span>
+                      <span class="sleep-timer">{formatCooldown(remainingSecs)}</span>
+                    </div>
+                  {:else}
+                    <div class="gen-tier-badge">K{tile.level || 1}</div>
+                    <div class="gen-charge-dot" title="{tile.chargesRemaining ?? gen.maxCharges}/{gen.maxCharges}">
+                      ⚡{tile.chargesRemaining ?? gen.maxCharges}
+                    </div>
+                  {/if}
                 </div>
               {:else}
                 {@const itemDef = getItem(tile.chainId, tile.level)}
@@ -232,7 +266,7 @@
         style="transform: translate3d({dragPointer.x - 28}px, {dragPointer.y - 28}px, 0)"
       >
         {#if tile.isGenerator && tile.generatorId}
-          {@html GENERATORS[tile.generatorId]?.svg || ''}
+          {@html getGeneratorTier(tile.generatorId, tile.level || 1).svg}
         {:else}
           {@html getItem(tile.chainId, tile.level)?.svg || ''}
         {/if}
@@ -242,22 +276,54 @@
 
   <!-- Bottom Item Info Panel -->
   <div class="item-info-bar">
-    {#if selectedGeneratorDef}
-      {@const genKey = selectedGeneratorDef.id === 'gen_cauldron' ? 'gen.cauldron.name' : selectedGeneratorDef.id === 'gen_desk' ? 'gen.desk.name' : 'gen.geode.name'}
+    {#if selectedTile && selectedTile.isGenerator && selectedTile.generatorId}
+      {@const gen = getGeneratorTier(selectedTile.generatorId, selectedTile.level || 1)}
+      {@const isSleeping = board.isGeneratorSleeping(selectedTile)}
+      {@const remainingSecs = isSleeping ? board.getGeneratorRemainingCooldown(selectedTile) : 0}
+      {@const genNameKey = `gen.${gen.id}.name`}
       <div class="info-content">
-        <div class="info-icon">
-          {@html selectedGeneratorDef.svg}
+        <div class="info-icon" style="border-color: {gen.color}">
+          {@html gen.svg}
         </div>
         <div class="info-meta">
-          <div class="info-title">{t(genKey)}</div>
-          <div class="info-desc">{t('board.spawnDesc')}</div>
+          <div class="info-title">
+            {t(genNameKey)}
+            <span class="tier-tag">K{selectedTile.level || 1}</span>
+          </div>
+          <div class="info-desc">
+            {#if isSleeping}
+              <span class="sleep-desc">💤 {t('gen.cooldown', { time: formatCooldown(remainingSecs) })}</span>
+            {:else}
+              <span>{t('gen.charges', { cur: selectedTile.chargesRemaining ?? gen.maxCharges, max: gen.maxCharges })}</span>
+            {/if}
+          </div>
         </div>
-        <button
-          class="action-btn spawn-btn"
-          onclick={() => board.spawnFromGenerator(board.selectedIndex!)}
-        >
-          {t('board.spawnBtn')}
-        </button>
+
+        <div class="info-actions">
+          {#if isSleeping}
+            <button
+              class="action-btn speedup-ad-btn"
+              onclick={() => board.speedupGenerator(board.selectedIndex!, 'ad')}
+              title={t('gen.wakeUpAd')}
+            >
+              {t('gen.wakeUpAd')}
+            </button>
+            <button
+              class="action-btn speedup-gems-btn"
+              onclick={() => board.speedupGenerator(board.selectedIndex!, 'gems')}
+              title={t('gen.wakeUpGems', { cost: 5 })}
+            >
+              5 💎
+            </button>
+          {:else}
+            <button
+              class="action-btn spawn-btn"
+              onclick={() => board.spawnFromGenerator(board.selectedIndex!)}
+            >
+              {t('board.spawnBtn')}
+            </button>
+          {/if}
+        </div>
       </div>
     {:else if selectedItemDef && selectedTile}
       {@const itemNameKey = `item.${selectedItemDef.id}.name`}
@@ -445,13 +511,105 @@
     line-height: 1;
   }
 
-  .gen-badge {
+  .generator-tile {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    border-radius: var(--radius-xs);
+    background: radial-gradient(circle, rgba(245, 205, 121, 0.12) 0%, rgba(14, 20, 37, 0.6) 100%);
+    border: 1.5px solid var(--gen-color, #f5cd79);
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.4);
+    transition: transform 0.12s, filter 0.2s;
+  }
+
+  .generator-tile.sleeping {
+    filter: grayscale(0.6) brightness(0.65);
+    border-color: rgba(255, 255, 255, 0.25);
+    background: rgba(14, 20, 37, 0.85);
+  }
+
+  .gen-sleep-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10, 8, 20, 0.7);
+    border-radius: var(--radius-xs);
+    z-index: 2;
+  }
+
+  .sleep-icon {
+    font-size: 11px;
+    animation: gentleBob 1.5s infinite ease-in-out;
+  }
+
+  @keyframes gentleBob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-2px); }
+  }
+
+  .sleep-timer {
+    font-size: 8px;
+    font-weight: 700;
+    color: #f5cd79;
+    font-family: monospace;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 0 2px;
+    border-radius: 3px;
+    margin-top: 1px;
+  }
+
+  .gen-tier-badge {
     position: absolute;
     top: 1px;
+    left: 1px;
+    background: #0f0c1d;
+    border: 1px solid var(--gen-color, #f5cd79);
+    color: var(--gen-color, #f5cd79);
+    font-size: 8px;
+    font-weight: 800;
+    padding: 0 3px;
+    border-radius: 3px;
+    line-height: 1.2;
+    z-index: 2;
+  }
+
+  .gen-charge-dot {
+    position: absolute;
+    bottom: 1px;
     right: 1px;
-    font-size: 10px;
-    color: var(--arcane-gold);
-    animation: bubbleFloat 2s infinite ease-in-out;
+    background: rgba(15, 12, 29, 0.9);
+    border: 1px solid rgba(245, 205, 121, 0.4);
+    color: #f5cd79;
+    font-size: 8px;
+    font-weight: 700;
+    padding: 0 3px;
+    border-radius: 3px;
+    line-height: 1.2;
+    z-index: 2;
+  }
+
+  .speedup-ad-btn {
+    background: linear-gradient(135deg, #4834d4, #686de0);
+    color: #fff;
+    box-shadow: 0 0 8px rgba(72, 52, 212, 0.5);
+  }
+
+  .speedup-gems-btn {
+    background: linear-gradient(135deg, #00d2d3, #54a0ff);
+    color: #032128;
+    font-weight: 800;
+    box-shadow: 0 0 8px rgba(0, 210, 211, 0.4);
+  }
+
+  .sleep-desc {
+    color: #f5cd79;
+    font-weight: 600;
   }
 
   .cobweb-overlay {

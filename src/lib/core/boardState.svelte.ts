@@ -1,4 +1,13 @@
-import { CHAINS, GENERATORS, getItem, getConsumableEnergyReward, type ItemDef } from '../config/chains';
+import {
+  CHAINS,
+  GENERATORS,
+  getItem,
+  getConsumableEnergyReward,
+  getGeneratorTier,
+  pickSpawnLevel,
+  type ItemDef,
+  type GeneratorDef
+} from '../config/chains';
 import { sound } from '../services/audio';
 import { energy } from './energyState.svelte';
 import { economy } from './economyState.svelte';
@@ -14,6 +23,9 @@ export interface BoardTile {
   level: number;
   isGenerator?: boolean;
   generatorId?: string;
+  chargesRemaining?: number;
+  maxCharges?: number;
+  cooldownUntil?: number;
   isCobweb?: boolean;
   isBubble?: boolean;
   bubbleExpiresAt?: number;
@@ -42,6 +54,17 @@ class BoardState {
       if (data) {
         const parsed = JSON.parse(data);
         if (Array.isArray(parsed) && parsed.length === TOTAL_CELLS) {
+          for (const tile of parsed) {
+            if (tile && tile.isGenerator && tile.generatorId) {
+              const def = getGeneratorTier(tile.generatorId, tile.level || 1);
+              if (tile.chargesRemaining === undefined) {
+                tile.chargesRemaining = def.maxCharges;
+              }
+              if (tile.maxCharges === undefined) {
+                tile.maxCharges = def.maxCharges;
+              }
+            }
+          }
           this.cells = parsed;
           return;
         }
@@ -60,13 +83,19 @@ class BoardState {
   public initStarterBoard() {
     const newCells: (BoardTile | null)[] = new Array(TOTAL_CELLS).fill(null);
 
+    const gen1 = getGeneratorTier('gen_cauldron', 1);
+    const gen2 = getGeneratorTier('gen_desk', 1);
+    const gen3 = getGeneratorTier('gen_geode', 1);
+
     // Generators in row 4
     newCells[22] = {
       id: 'gen_1',
       chainId: 'potions',
       level: 1,
       isGenerator: true,
-      generatorId: 'gen_cauldron'
+      generatorId: 'gen_cauldron_1',
+      chargesRemaining: gen1.maxCharges,
+      maxCharges: gen1.maxCharges
     };
 
     newCells[23] = {
@@ -74,7 +103,9 @@ class BoardState {
       chainId: 'scrolls',
       level: 1,
       isGenerator: true,
-      generatorId: 'gen_desk'
+      generatorId: 'gen_desk_1',
+      chargesRemaining: gen2.maxCharges,
+      maxCharges: gen2.maxCharges
     };
 
     newCells[24] = {
@@ -82,7 +113,9 @@ class BoardState {
       chainId: 'crystals',
       level: 1,
       isGenerator: true,
-      generatorId: 'gen_geode'
+      generatorId: 'gen_geode_1',
+      chargesRemaining: gen3.maxCharges,
+      maxCharges: gen3.maxCharges
     };
 
     // Starter Items to merge right away
@@ -131,12 +164,40 @@ class BoardState {
     return null;
   }
 
+  public isGeneratorSleeping(tile: BoardTile): boolean {
+    if (!tile.isGenerator) return false;
+    if (tile.cooldownUntil) {
+      if (Date.now() < tile.cooldownUntil) {
+        return true;
+      } else {
+        // Cooldown has expired, auto-replenish charges
+        tile.cooldownUntil = undefined;
+        const genDef = getGeneratorTier(tile.generatorId || 'gen_cauldron', tile.level || 1);
+        tile.chargesRemaining = genDef.maxCharges;
+        tile.maxCharges = genDef.maxCharges;
+        this.save();
+        return false;
+      }
+    }
+    return false;
+  }
+
+  public getGeneratorRemainingCooldown(tile: BoardTile): number {
+    if (!tile.cooldownUntil) return 0;
+    return Math.max(0, Math.ceil((tile.cooldownUntil - Date.now()) / 1000));
+  }
+
   public spawnFromGenerator(index: number): boolean {
     const tile = this.cells[index];
     if (!tile || !tile.isGenerator || !tile.generatorId) return false;
 
-    const genDef = GENERATORS[tile.generatorId];
-    if (!genDef) return false;
+    // Check if sleeping
+    if (this.isGeneratorSleeping(tile)) {
+      sound.playClick();
+      return false;
+    }
+
+    const genDef = getGeneratorTier(tile.generatorId, tile.level || 1);
 
     if (!energy.spend(1)) {
       sound.playClick();
@@ -151,8 +212,7 @@ class BoardState {
       return false;
     }
 
-    // 80% chance Level 1, 20% chance Level 2
-    const spawnLevel = Math.random() < 0.2 ? 2 : 1;
+    const spawnLevel = pickSpawnLevel(genDef.dropRates);
 
     this.cells[emptyCell] = {
       id: `${genDef.spawnChainId}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -160,8 +220,40 @@ class BoardState {
       level: spawnLevel
     };
 
+    // Deduct charge
+    const currentCharges = (tile.chargesRemaining ?? genDef.maxCharges) - 1;
+    tile.chargesRemaining = currentCharges;
+    tile.maxCharges = genDef.maxCharges;
+
+    // If out of charges, trigger cooldown
+    if (currentCharges <= 0) {
+      tile.cooldownUntil = Date.now() + genDef.cooldownSeconds * 1000;
+    }
+
     sound.playPop();
     this.addParticleEffect(emptyCell, genDef.color);
+    this.save();
+    return true;
+  }
+
+  public speedupGenerator(index: number, method: 'ad' | 'gems'): boolean {
+    const tile = this.cells[index];
+    if (!tile || !tile.isGenerator || !tile.generatorId) return false;
+
+    if (method === 'gems') {
+      if (!economy.spendGems(5)) {
+        sound.playClick();
+        return false;
+      }
+    }
+
+    const genDef = getGeneratorTier(tile.generatorId, tile.level || 1);
+    tile.cooldownUntil = undefined;
+    tile.chargesRemaining = genDef.maxCharges;
+    tile.maxCharges = genDef.maxCharges;
+
+    sound.playSparkle();
+    this.addParticleEffect(index, '#f5cd79');
     this.save();
     return true;
   }
@@ -171,8 +263,22 @@ class BoardState {
     const src = this.cells[sourceIndex];
     const dst = this.cells[targetIndex];
     if (!src || !dst) return false;
+    if (src.isCobweb) return false;
+
+    // Both are generators
+    if (src.isGenerator && dst.isGenerator) {
+      if (!src.generatorId || !dst.generatorId) return false;
+      const srcFamily = src.generatorId.replace(/_\d+$/, '');
+      const dstFamily = dst.generatorId.replace(/_\d+$/, '');
+      if (srcFamily !== dstFamily) return false;
+      if (src.level !== dst.level) return false;
+      const maxTier = srcFamily === 'gen_geode' ? 3 : 4;
+      return src.level < maxTier;
+    }
+
+    // One is generator and one is not
     if (src.isGenerator || dst.isGenerator) return false;
-    if (src.isCobweb) return false; // Source tile under cobweb cannot be moved
+
     if (src.chainId !== dst.chainId) return false;
     if (src.level !== dst.level) return false;
 
@@ -185,14 +291,36 @@ class BoardState {
 
     const src = this.cells[sourceIndex]!;
     const dst = this.cells[targetIndex]!;
-
     const newLevel = dst.level + 1;
+
+    // Merging two generators into higher tier
+    if (src.isGenerator && dst.isGenerator) {
+      const family = dst.generatorId!.replace(/_\d+$/, '');
+      const nextDef = getGeneratorTier(family, newLevel);
+
+      this.cells[sourceIndex] = null;
+      this.cells[targetIndex] = {
+        id: `${nextDef.id}_${Date.now()}`,
+        chainId: dst.chainId,
+        level: newLevel,
+        isGenerator: true,
+        generatorId: nextDef.id,
+        chargesRemaining: nextDef.maxCharges,
+        maxCharges: nextDef.maxCharges,
+        cooldownUntil: undefined
+      };
+
+      sound.playFanfare();
+      this.addParticleEffect(targetIndex, nextDef.color);
+      economy.addXp(newLevel * 25);
+      this.selectedIndex = targetIndex;
+      this.save();
+      return true;
+    }
+
+    // Standard item merge
     const targetChain = dst.chainId;
-
-    // Remove source tile
     this.cells[sourceIndex] = null;
-
-    // Upgrade target tile and clear cobweb if present
     this.cells[targetIndex] = {
       id: `${targetChain}_${Date.now()}`,
       chainId: targetChain,
@@ -200,12 +328,9 @@ class BoardState {
       isCobweb: false
     };
 
-    // Feedback
     sound.playMerge(newLevel);
     const itemDef = getItem(targetChain, newLevel);
     this.addParticleEffect(targetIndex, itemDef?.color || '#f5cd79');
-
-    // Experience award on merge
     economy.addXp(newLevel * 5);
 
     // 12% chance to spawn a merge bubble for T4+
