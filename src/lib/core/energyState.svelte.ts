@@ -90,6 +90,11 @@ class EnergyState {
     this.save();
   }
 
+  public addBonus(amount: number) {
+    this.current += amount;
+    this.save();
+  }
+
   public get formattedNextRefill(): string {
     if (this.current >= this.max) return 'МАКС';
     const mins = Math.floor(this.secondsRemaining / 60);

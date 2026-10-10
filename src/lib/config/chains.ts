@@ -444,3 +444,20 @@ export function getItemName(chainId: string, level: number): string {
   return item.id;
 }
 
+export const CRYSTAL_ENERGY_REWARDS: Record<number, number> = {
+  1: 1,
+  2: 3,
+  3: 8,
+  4: 18,
+  5: 40,
+  6: 85,
+  7: 180
+};
+
+export function getConsumableEnergyReward(chainId: string, level: number): number | null {
+  if (chainId === 'crystals') {
+    return CRYSTAL_ENERGY_REWARDS[level] ?? null;
+  }
+  return null;
+}
+

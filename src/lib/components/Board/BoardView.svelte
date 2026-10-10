@@ -6,7 +6,9 @@
     TOTAL_CELLS,
     type BoardTile
   } from '../../core/boardState.svelte';
-  import { CHAINS, GENERATORS, getItem } from '../../config/chains';
+  import { CHAINS, GENERATORS, getItem, getConsumableEnergyReward } from '../../config/chains';
+  import { inventory } from '../../core/inventoryState.svelte';
+  import InventoryDrawer from './InventoryDrawer.svelte';
   import { sound } from '../../services/audio';
   import { t } from '../../services/i18n.svelte';
 
@@ -105,9 +107,34 @@
       ? GENERATORS[selectedTile.generatorId]
       : null
   );
+
+  let selectedEnergyReward = $derived(
+    selectedTile && !selectedTile.isGenerator
+      ? getConsumableEnergyReward(selectedTile.chainId, selectedTile.level)
+      : null
+  );
 </script>
 
 <div class="board-screen">
+  <!-- Top Utility Bar: Backpack Toggle -->
+  <div class="board-top-bar">
+    <button
+      class="backpack-toggle-btn {inventory.isFull ? 'full' : ''}"
+      onclick={() => inventory.openDrawer()}
+      aria-label={t('inventory.title')}
+    >
+      <span class="backpack-icon-svg">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M7 6V4a3 3 0 016 0v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <rect x="4" y="6" width="16" height="15" rx="3" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M4 11h16M10 11v4m4-4v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="backpack-label">{t('inventory.title')}</span>
+      <span class="backpack-badge">{inventory.usedSlotsCount}/{inventory.slotCount}</span>
+    </button>
+  </div>
+
   <!-- Board Grid Container (7 columns x 9 rows) -->
   <div class="board-frame">
     <div class="board-grid" bind:this={boardElement}>
@@ -248,6 +275,23 @@
         </div>
         <div class="info-actions">
           {#if !selectedTile.isCobweb && !selectedTile.isBubble}
+            {#if selectedEnergyReward}
+              <button
+                class="action-btn energy-act-btn"
+                onclick={() => board.useConsumable(board.selectedIndex!)}
+                title={t('board.useConsumable', { amount: selectedEnergyReward })}
+              >
+                ⚡ +{selectedEnergyReward}
+              </button>
+            {/if}
+            <button
+              class="action-btn backpack-store-btn"
+              disabled={inventory.isFull}
+              onclick={() => board.moveToInventory(board.selectedIndex!)}
+              title={inventory.isFull ? t('inventory.full') : t('inventory.toInventory')}
+            >
+              🎒
+            </button>
             <button class="action-btn sell-btn" onclick={handleSell}>
               {t('board.sell', { amount: selectedItemDef.sellValue })}
             </button>
@@ -267,6 +311,9 @@
       </div>
     {/if}
   </div>
+
+  <!-- Inventory Drawer Sheet -->
+  <InventoryDrawer />
 </div>
 
 <style>
@@ -582,6 +629,31 @@
     box-shadow: 0 0 10px rgba(245, 205, 121, 0.4);
   }
 
+  .energy-act-btn {
+    background: linear-gradient(135deg, #10ac84, #1dd1a1);
+    color: #fff;
+    box-shadow: 0 0 10px rgba(16, 172, 132, 0.4);
+    animation: pulseEnergy 2s infinite ease-in-out;
+  }
+
+  @keyframes pulseEnergy {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 8px rgba(16, 172, 132, 0.4); }
+    50% { transform: scale(1.03); box-shadow: 0 0 14px rgba(29, 209, 161, 0.7); }
+  }
+
+  .backpack-store-btn {
+    background: rgba(140, 122, 230, 0.2);
+    border: 1px solid rgba(140, 122, 230, 0.5);
+    color: #f1f2f6;
+    padding: 6px 10px;
+    font-size: 14px;
+  }
+
+  .backpack-store-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
   .sell-btn {
     background: rgba(245, 205, 121, 0.15);
     border: 1px solid rgba(245, 205, 121, 0.4);
@@ -591,6 +663,64 @@
   .unlock-btn {
     background: linear-gradient(135deg, #10ac84, #00d2d3);
     color: #042921;
+  }
+
+  .board-top-bar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 0 2px 4px 2px;
+    width: 100%;
+  }
+
+  .backpack-toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(28, 22, 48, 0.85);
+    border: 1.2px solid rgba(245, 205, 121, 0.35);
+    border-radius: 12px;
+    padding: 3px 8px;
+    color: #f5cd79;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    transition: transform 0.15s, border-color 0.15s, background 0.15s;
+  }
+
+  .backpack-toggle-btn:active {
+    transform: scale(0.95);
+  }
+
+  .backpack-toggle-btn.full {
+    border-color: #ff4757;
+    color: #ff6b81;
+  }
+
+  .backpack-icon-svg {
+    width: 14px;
+    height: 14px;
+    display: flex;
+    align-items: center;
+  }
+
+  .backpack-icon-svg svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .backpack-badge {
+    background: rgba(245, 205, 121, 0.2);
+    border-radius: 6px;
+    padding: 1px 5px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .backpack-toggle-btn.full .backpack-badge {
+    background: rgba(255, 71, 87, 0.25);
+    color: #fff;
   }
 
   .info-placeholder {

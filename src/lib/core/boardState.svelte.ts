@@ -1,7 +1,8 @@
-import { CHAINS, GENERATORS, getItem, type ItemDef } from '../config/chains';
+import { CHAINS, GENERATORS, getItem, getConsumableEnergyReward, type ItemDef } from '../config/chains';
 import { sound } from '../services/audio';
 import { energy } from './energyState.svelte';
 import { economy } from './economyState.svelte';
+import { inventory } from './inventoryState.svelte';
 
 export const BOARD_COLS = 7;
 export const BOARD_ROWS = 9;
@@ -306,10 +307,13 @@ class BoardState {
 
   public selectCell(index: number) {
     if (this.selectedIndex === index) {
-      // Tapping selected generator again spawns item
       const tile = this.cells[index];
       if (tile?.isGenerator) {
         this.spawnFromGenerator(index);
+        return;
+      }
+      if (tile && getConsumableEnergyReward(tile.chainId, tile.level)) {
+        this.useConsumable(index);
         return;
       }
       this.selectedIndex = null;
@@ -330,6 +334,70 @@ class BoardState {
     setTimeout(() => {
       this.particles = this.particles.filter((p) => p.id !== id);
     }, 600);
+  }
+
+  public moveToInventory(index: number): boolean {
+    const tile = this.cells[index];
+    if (!tile || tile.isGenerator || tile.isCobweb || tile.isBubble) return false;
+    if (inventory.isFull) {
+      sound.playClick();
+      return false;
+    }
+
+    const stored = inventory.storeItem({
+      id: tile.id,
+      chainId: tile.chainId,
+      level: tile.level
+    });
+
+    if (stored) {
+      this.cells[index] = null;
+      if (this.selectedIndex === index) {
+        this.selectedIndex = null;
+      }
+      this.save();
+      return true;
+    }
+    return false;
+  }
+
+  public placeItemFromInventory(tile: { id: string; chainId: string; level: number }): boolean {
+    const emptyIndex = this.findNearestEmptyCell(Math.floor(TOTAL_CELLS / 2));
+    if (emptyIndex === null) {
+      sound.playClick();
+      return false;
+    }
+
+    this.cells[emptyIndex] = {
+      id: tile.id,
+      chainId: tile.chainId,
+      level: tile.level
+    };
+
+    sound.playPop();
+    const itemDef = getItem(tile.chainId, tile.level);
+    this.addParticleEffect(emptyIndex, itemDef?.color || '#a4b0be');
+    this.selectedIndex = emptyIndex;
+    this.save();
+    return true;
+  }
+
+  public useConsumable(index: number): boolean {
+    const tile = this.cells[index];
+    if (!tile || tile.isGenerator || tile.isCobweb || tile.isBubble) return false;
+
+    const energyVal = getConsumableEnergyReward(tile.chainId, tile.level);
+    if (!energyVal) return false;
+
+    energy.addBonus(energyVal);
+    sound.playSparkle();
+    const itemDef = getItem(tile.chainId, tile.level);
+    this.addParticleEffect(index, itemDef?.color || '#2ed573');
+
+    this.cells[index] = null;
+    this.selectedIndex = null;
+    this.save();
+    return true;
   }
 
   public get selectedItemDef(): ItemDef | null {
