@@ -5,8 +5,15 @@
   import MetaRoomView from './lib/components/MetaRoom/MetaRoomView.svelte';
   import OrdersView from './lib/components/Orders/OrdersView.svelte';
   import ShopModal from './lib/components/Shop/ShopModal.svelte';
+  import { t } from './lib/services/i18n.svelte';
 
   let activeScreen = $state<ScreenType>('board');
+
+  $effect(() => {
+    if (typeof document !== 'undefined') {
+      document.title = t('app.title');
+    }
+  });
 </script>
 
 <div class="game-viewport">

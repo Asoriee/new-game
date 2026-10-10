@@ -437,3 +437,10 @@ export const CHAINS: Record<string, ChainDef> = {
 export function getItem(chainId: string, level: number): ItemDef | undefined {
   return CHAINS[chainId]?.items.find((it) => it.level === level);
 }
+
+export function getItemName(chainId: string, level: number): string {
+  const item = getItem(chainId, level);
+  if (!item) return '';
+  return item.id;
+}
+

@@ -2,6 +2,7 @@
   import { sound } from '../../services/audio';
   import { orders } from '../../core/ordersState.svelte';
   import { economy } from '../../core/economyState.svelte';
+  import { t } from '../../services/i18n.svelte';
 
   export type ScreenType = 'board' | 'room' | 'orders' | 'shop';
 
@@ -39,7 +40,7 @@
         <path d="M10 6l-5 12a3 3 0 0 0 2.8 4h8.4a3 3 0 0 0 2.8-4l-5-12z" stroke="currentColor" stroke-width="1.8"/>
       </svg>
     </div>
-    <span class="tab-label">Лаборатория</span>
+    <span class="tab-label">{t('nav.laboratory')}</span>
   </button>
 
   <!-- Meta Room Tab -->
@@ -56,7 +57,7 @@
         <span class="badge star-badge">★</span>
       {/if}
     </div>
-    <span class="tab-label">Кабинет</span>
+    <span class="tab-label">{t('nav.study')}</span>
   </button>
 
   <!-- Orders Tab -->
@@ -75,7 +76,7 @@
         <span class="badge order-badge">{readyOrdersCount}</span>
       {/if}
     </div>
-    <span class="tab-label">Заказы</span>
+    <span class="tab-label">{t('nav.orders')}</span>
   </button>
 
   <!-- Shop Tab -->
@@ -91,7 +92,7 @@
         <line x1="18" y1="3" x2="12" y2="9" stroke="currentColor" stroke-width="1.8"/>
       </svg>
     </div>
-    <span class="tab-label">Лавка</span>
+    <span class="tab-label">{t('nav.shop')}</span>
   </button>
 </nav>
 

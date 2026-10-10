@@ -2,21 +2,37 @@
   import { orders } from '../../core/ordersState.svelte';
   import { getItem } from '../../config/chains';
   import { sound } from '../../services/audio';
+  import { t } from '../../services/i18n.svelte';
 
   function handleComplete(orderId: string) {
     orders.completeOrder(orderId);
+  }
+
+  function getCharacterKey(name: string): 'corvus' | 'lucian' | 'mira' {
+    if (name.includes('Корвус') || name.includes('Corvus')) return 'corvus';
+    if (name.includes('Люциан') || name.includes('Lucian')) return 'lucian';
+    return 'mira';
+  }
+
+  function getOrderDialogue(order: (typeof orders.orders)[0]): string {
+    const key = getCharacterKey(order.characterName);
+    if (order.id === 'ord_1' || order.id === 'ord_2' || order.id === 'ord_3') {
+      return t(`char.${key}.dialogue1`);
+    }
+    return t('orders.genericDialogue');
   }
 </script>
 
 <div class="orders-screen">
   <div class="orders-header">
-    <h2>Заказы Академии</h2>
-    <span class="orders-sub">Помогайте преподавателям и студентам, чтобы получать Звезды</span>
+    <h2>{t('orders.title')}</h2>
+    <span class="orders-sub">{t('orders.subtitle')}</span>
   </div>
 
   <div class="orders-list">
     {#each orders.orders as order (order.id)}
       {@const canComplete = orders.canCompleteOrder(order)}
+      {@const charKey = getCharacterKey(order.characterName)}
 
       <div class="order-card {canComplete ? 'ready' : ''}">
         <!-- Character Info Header -->
@@ -25,19 +41,19 @@
             {@html order.avatarSvg}
           </div>
           <div class="char-meta">
-            <div class="char-name">{order.characterName}</div>
-            <div class="char-role">{order.characterRole}</div>
+            <div class="char-name">{t(`char.${charKey}.name`)}</div>
+            <div class="char-role">{t(`char.${charKey}.role`)}</div>
           </div>
         </div>
 
         <!-- Dialogue Bubble -->
         <div class="dialogue-box">
-          <p>«{order.dialogue}»</p>
+          <p>«{getOrderDialogue(order)}»</p>
         </div>
 
         <!-- Required Items List -->
         <div class="requirements-box">
-          <span class="req-label">Требуется:</span>
+          <span class="req-label">{t('orders.required')}</span>
           <div class="items-row">
             {#each order.requirements as req}
               {@const itemDef = getItem(req.chainId, req.level)}
@@ -48,8 +64,8 @@
                   {@html itemDef?.svg || ''}
                 </div>
                 <div class="req-info">
-                  <span class="req-name">{itemDef?.name || 'Предмет'}</span>
-                  <span class="req-level">Ур. {req.level}</span>
+                  <span class="req-name">{itemDef ? t(`item.${itemDef.id}.name`) : ''}</span>
+                  <span class="req-level">{t('board.tier', { level: req.level })}</span>
                 </div>
                 <span class="req-status-icon">{hasItem ? '✓' : '…'}</span>
               </div>
@@ -70,7 +86,7 @@
             disabled={!canComplete}
             onclick={() => handleComplete(order.id)}
           >
-            {canComplete ? 'Сдать заказ!' : 'В процессе'}
+            {canComplete ? t('orders.complete') : t('orders.inProgress')}
           </button>
         </div>
       </div>

@@ -3,6 +3,7 @@
   import { metaRoom } from '../../core/metaState.svelte';
   import { economy } from '../../core/economyState.svelte';
   import { sound } from '../../services/audio';
+  import { t } from '../../services/i18n.svelte';
 
   let selectedObject = $state<RoomObjectDef | null>(null);
   let selectedVariant = $state<'A' | 'B' | 'C'>('A');
@@ -38,8 +39,8 @@
   <!-- Room Header -->
   <div class="room-header">
     <div class="room-title-group">
-      <h2>{ALCHEMIST_LAB.name}</h2>
-      <span class="room-sub">{ALCHEMIST_LAB.subtitle}</span>
+      <h2>{t('room.title')}</h2>
+      <span class="room-sub">{t('room.subtitle')}</span>
     </div>
     <div class="progress-pill">
       <span class="progress-val">{metaRoom.completionPercentage}%</span>
@@ -256,9 +257,9 @@
       >
         <div class="sheet-header">
           <div class="sheet-title-group">
-            <h3>{selectedObject.name}</h3>
+            <h3>{t(`obj.${selectedObject.id}.name`)}</h3>
             <span class="sheet-sub">
-              {isUnlocked ? 'Выберите стиль декора' : `Стоимость: ${selectedObject.starCost} ★`}
+              {isUnlocked ? t('room.chooseStyle') : t('room.cost', { cost: selectedObject.starCost })}
             </span>
           </div>
           <button class="sheet-close-btn" onclick={closeModal}>×</button>
@@ -278,8 +279,8 @@
               <div class="variant-swatch" style="--v-color: {variant.color}">
                 <span class="v-letter">{variant.id}</span>
               </div>
-              <div class="variant-name">{variant.name}</div>
-              <div class="variant-desc">{variant.desc}</div>
+              <div class="variant-name">{t(`obj.${selectedObject.id}.var${variant.id}`)}</div>
+              <div class="variant-desc">{t(`obj.${selectedObject.id}.var${variant.id}Desc`)}</div>
             </button>
           {/each}
         </div>
@@ -288,7 +289,7 @@
         <div class="sheet-footer">
           {#if isUnlocked}
             <button class="confirm-btn apply-btn" onclick={handleApplyStyle}>
-              Применить стиль
+              {t('room.applyStyle')}
             </button>
           {:else}
             <button
@@ -297,9 +298,9 @@
               onclick={handleApplyStyle}
             >
               {#if canAfford}
-                Восстановить за {selectedObject.starCost} ★
+                {t('room.restoreBtn', { cost: selectedObject.starCost })}
               {:else}
-                Не хватает звезд ({economy.stars}/{selectedObject.starCost} ★)
+                {t('room.notEnoughStars', { current: economy.stars, cost: selectedObject.starCost })}
               {/if}
             </button>
           {/if}

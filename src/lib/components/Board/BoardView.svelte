@@ -8,6 +8,7 @@
   } from '../../core/boardState.svelte';
   import { CHAINS, GENERATORS, getItem } from '../../config/chains';
   import { sound } from '../../services/audio';
+  import { t } from '../../services/i18n.svelte';
 
   let boardElement: HTMLDivElement | null = $state(null);
   let dragTileIndex = $state<number | null>(null);
@@ -153,7 +154,7 @@
 
               <!-- Cobweb overlay -->
               {#if tile.isCobweb}
-                <div class="cobweb-overlay" title="Паутина: объедините или снимите">
+                <div class="cobweb-overlay" title={t('board.cobwebTitle')}>
                   <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M0 0l40 40M40 0L0 40M20 0v40M0 20h40" stroke="rgba(255,255,255,0.4)" stroke-width="0.8"/>
                     <circle cx="20" cy="20" r="10" stroke="rgba(255,255,255,0.4)" stroke-width="0.8" fill="none"/>
@@ -215,51 +216,54 @@
   <!-- Bottom Item Info Panel -->
   <div class="item-info-bar">
     {#if selectedGeneratorDef}
+      {@const genKey = selectedGeneratorDef.id === 'gen_cauldron' ? 'gen.cauldron.name' : selectedGeneratorDef.id === 'gen_desk' ? 'gen.desk.name' : 'gen.geode.name'}
       <div class="info-content">
         <div class="info-icon">
           {@html selectedGeneratorDef.svg}
         </div>
         <div class="info-meta">
-          <div class="info-title">{selectedGeneratorDef.name}</div>
-          <div class="info-desc">Нажмите, чтобы создать предмет (-1 ⚡)</div>
+          <div class="info-title">{t(genKey)}</div>
+          <div class="info-desc">{t('board.spawnDesc')}</div>
         </div>
         <button
           class="action-btn spawn-btn"
           onclick={() => board.spawnFromGenerator(board.selectedIndex!)}
         >
-          Создать ⚡
+          {t('board.spawnBtn')}
         </button>
       </div>
     {:else if selectedItemDef && selectedTile}
+      {@const itemNameKey = `item.${selectedItemDef.id}.name`}
+      {@const itemDescKey = `item.${selectedItemDef.id}.desc`}
       <div class="info-content">
         <div class="info-icon">
           {@html selectedItemDef.svg}
         </div>
         <div class="info-meta">
           <div class="info-title">
-            {selectedItemDef.name}
-            <span class="tier-tag">Ур. {selectedTile.level}</span>
+            {t(itemNameKey)}
+            <span class="tier-tag">{t('board.tier', { level: selectedTile.level })}</span>
           </div>
-          <div class="info-desc">{selectedItemDef.desc}</div>
+          <div class="info-desc">{t(itemDescKey)}</div>
         </div>
         <div class="info-actions">
           {#if !selectedTile.isCobweb && !selectedTile.isBubble}
             <button class="action-btn sell-btn" onclick={handleSell}>
-              +{selectedItemDef.sellValue} 🪙
+              {t('board.sell', { amount: selectedItemDef.sellValue })}
             </button>
           {:else if selectedTile.isCobweb}
             <button
               class="action-btn unlock-btn"
               onclick={() => board.unlockCobweb(board.selectedIndex!)}
             >
-              Снять паутину
+              {t('board.removeWeb')}
             </button>
           {/if}
         </div>
       </div>
     {:else}
       <div class="info-placeholder">
-        <span>Перетаскивайте и объединяйте одинаковые предметы</span>
+        <span>{t('board.prompt')}</span>
       </div>
     {/if}
   </div>

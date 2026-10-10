@@ -2,6 +2,7 @@
   import { energy } from '../../core/energyState.svelte';
   import { economy } from '../../core/economyState.svelte';
   import { sound } from '../../services/audio';
+  import { t } from '../../services/i18n.svelte';
 
   interface Props {
     onClose?: () => void;
@@ -43,19 +44,19 @@
 
 <div class="shop-screen">
   <div class="shop-header">
-    <h2>Магическая Лавка</h2>
-    <span class="shop-sub">Пополнение энергии и редкие артефакты Академии</span>
+    <h2>{t('shop.title')}</h2>
+    <span class="shop-sub">{t('shop.subtitle')}</span>
   </div>
 
   <div class="shop-content">
     <!-- Starter Pack Banner -->
     <div class="offer-banner">
-      <div class="banner-badge">ХИТ СЕЗОНА</div>
+      <div class="banner-badge">{t('shop.hitBadge')}</div>
       <div class="banner-body">
         <div class="banner-icon">✨</div>
         <div class="banner-text">
-          <h3>Набор Адепта Арканум</h3>
-          <p>150 Энергии + 50 Кристаллов + Эксклюзивный Котел</p>
+          <h3>{t('shop.starterPackTitle')}</h3>
+          <p>{t('shop.starterPackDesc')}</p>
         </div>
       </div>
       <button class="buy-pack-btn" onclick={() => {
@@ -63,27 +64,27 @@
         energy.add(150);
         sound.playFanfare();
       }}>
-        25 Ян (Тест)
+        {t('shop.starterPackPrice')}
       </button>
     </div>
 
     <!-- Section: Energy -->
     <div class="shop-section">
-      <h3 class="section-title">⚡ Источник Энергии</h3>
+      <h3 class="section-title">{t('shop.energySection')}</h3>
       <div class="cards-grid">
         <!-- Rewarded Video Energy -->
         <div class="shop-card rewarded-card">
           <div class="card-icon">🎬</div>
           <div class="card-info">
-            <div class="card-title">+25 Энергии</div>
-            <div class="card-desc">Восстановление за просмотр рекламы</div>
+            <div class="card-title">{t('shop.rewardedTitle')}</div>
+            <div class="card-desc">{t('shop.rewardedDesc')}</div>
           </div>
           <button
             class="card-action-btn rewarded-btn"
             disabled={rewardedClaimCooldown}
             onclick={handleClaimRewardedEnergy}
           >
-            {rewardedClaimCooldown ? 'Зачислено!' : 'Смотреть'}
+            {rewardedClaimCooldown ? t('shop.rewardedClaimed') : t('shop.rewardedBtn')}
           </button>
         </div>
 
@@ -91,8 +92,8 @@
         <div class="shop-card">
           <div class="card-icon">⚡</div>
           <div class="card-info">
-            <div class="card-title">+50 Энергии</div>
-            <div class="card-desc">Мгновенный заряд от кристалла</div>
+            <div class="card-title">{t('shop.gemEnergyTitle')}</div>
+            <div class="card-desc">{t('shop.gemEnergyDesc')}</div>
           </div>
           <button class="card-action-btn gem-btn" onclick={handleBuyEnergyForGems}>
             10 💎
@@ -103,13 +104,13 @@
 
     <!-- Section: Gold Coins -->
     <div class="shop-section">
-      <h3 class="section-title">🪙 Золотая Казна</h3>
+      <h3 class="section-title">{t('shop.coinsSection')}</h3>
       <div class="cards-grid">
         <div class="shop-card">
           <div class="card-icon">💰</div>
           <div class="card-info">
-            <div class="card-title">300 Монет</div>
-            <div class="card-desc">Кошель алхимического золота</div>
+            <div class="card-title">{t('shop.coinsPackTitle')}</div>
+            <div class="card-desc">{t('shop.coinsPackDesc')}</div>
           </div>
           <button class="card-action-btn gem-btn" onclick={handleBuyCoinsForGems}>
             15 💎
